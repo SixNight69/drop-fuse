@@ -86,14 +86,46 @@ void PixelLookAndFeel::drawRotarySlider (Graphics& g, int x, int y, int w, int h
         g.fillRect (rect);
     }
 
-    // square knob body
-    const float kb = r * (r > 50.0f ? 1.05f : 0.95f);
+    const float ang = startAngle + pos * (endAngle - startAngle);
+
+    if (r > 50.0f)
+    {
+        // big BUILD knob: the face is our pixel dynamite bundle, heating up as it turns
+        const float kb = r * 1.0f;
+        auto body = Rectangle<float> (kb, kb).withCentre (c).toNearestInt().toFloat();
+        g.setColour (Colour (0xff1a1d24)); g.fillRect (body);
+        g.setColour (Colour (0xff3a3f4a)); g.drawRect (body, 3.0f);
+
+        const float px = std::floor (kb * 0.86f / (float) artW);
+        const auto tl = Point<float> (c.x - artW * px * 0.5f, c.y - artH * px * 0.5f + px * 0.5f);
+        for (int row = 0; row < artH; ++row)
+            for (int col = 0; col < artW; ++col)
+            {
+                const char ch = dynamiteArt[row][col];
+                if (ch == '.') continue;
+                auto colr = artColour (ch);
+                if (ch != 'F') colr = colr.interpolatedWith (Colour (0xffffe0a0), pos * pos * 0.45f);
+                g.setColour (colr);
+                g.fillRect (Rectangle<float> (tl.x + (float) col * px, tl.y + (float) row * px, px, px));
+            }
+
+        // pointer: a hot spark riding the ring
+        auto tip = c.getPointOnCircumference (r - sq * 0.6f, ang);
+        const float ts = sq * 1.5f;
+        g.setColour (Colour (0xffffd60a));
+        g.fillRect (Rectangle<float> (ts, ts).withCentre (tip).toNearestInt().toFloat());
+        g.setColour (Colours::white);
+        g.fillRect (Rectangle<float> (ts * 0.5f, ts * 0.5f).withCentre (tip).toNearestInt().toFloat());
+        return;
+    }
+
+    // small knobs: plain square body
+    const float kb = r * 0.95f;
     auto body = Rectangle<float> (kb, kb).withCentre (c).toNearestInt().toFloat();
     g.setColour (Colour (0xff3a3f4a)); g.fillRect (body);
     g.setColour (Colour (0xff555b68)); g.fillRect (body.removeFromTop (3.0f));
     g.setColour (Colour (0xff1c1f26)); g.fillRect (body.removeFromBottom (3.0f));
 
-    const float ang = startAngle + pos * (endAngle - startAngle);
     auto tip = c.getPointOnCircumference (kb * 0.36f, ang);
     g.setColour (Colours::white);
     const float ts = jmax (5.0f, r * 0.12f);
@@ -378,15 +410,17 @@ void DropTNTEditor::drawReadout (Graphics& g)
 {
     const int div = processor.displayDivision.load();
     const float cut = processor.displayCutoff.load();
-    const float rev = processor.displayReverb.load();
-    const float width = processor.displayWidth.load();
+    const float echoBeats = processor.displayEchoBeats.load();
+    const float ratio = processor.displayRatio.load();
+    auto echoText = echoBeats <= 0.0f ? String ("OFF")
+                                      : "1/" + String (roundToInt (1.0f / echoBeats));
 
     auto cutText = cut >= 1000.0f ? String (cut / 1000.0f, 2) + "kHz" : String (roundToInt (cut)) + "Hz";
     auto items = StringArray {
         String ("GATE ") + DropTNTProcessor::divisionName (div),
         "LOW CUT " + cutText,
-        "REVERB " + String (roundToInt (rev * 100.0f)) + "%",
-        "WIDTH " + String (roundToInt (width * 100.0f)) + "%"
+        "ECHO " + echoText,
+        "SQUASH " + String (ratio, 1) + ":1"
     };
 
     auto area = readoutArea;
@@ -414,7 +448,7 @@ void DropTNTEditor::paint (Graphics& g)
     g.drawText ("DROP TNT", 20, 10, 300, 34, Justification::centredLeft);
     g.setFont (PixelLookAndFeel::pixelFont (12.0f));
     g.setColour (textDim);
-    g.drawText ("build-up macro // draw automation 0 -> 100, pull to 0 at the drop",
+    g.drawText ("squeeze it to a point // pull to 0 at the drop",
                 getLocalBounds().withHeight (56).reduced (20, 0), Justification::centredRight);
 
     // scene
@@ -443,6 +477,34 @@ void DropTNTEditor::paint (Graphics& g)
         if (hiddenTime <= 0.0f)
             drawDynamite (g, getGeometry(), currentFlash, respawn);
         drawParticles (g);
+
+        // tension: the world closes in around the dynamite (pixel iris)
+        if (build > 0.02f && hiddenTime <= 0.0f)
+        {
+            const auto geo = getGeometry();
+            const auto centre = geo.topLeft + Point<float> (artW * geo.px * 0.5f, artH * geo.px * 0.5f);
+            const float maxR = 520.0f, minR = artW * geo.px * 0.62f;
+            const float t = std::pow (build, 0.9f);
+            const float rad = maxR + (minR - maxR) * t;
+
+            Path iris;
+            iris.addRectangle (sceneArea.toFloat().expanded (20.0f));
+            iris.addEllipse (Rectangle<float> (rad * 2.0f, rad * 2.0f).withCentre (centre));
+            iris.setUsingNonZeroWinding (false);
+            g.setColour (Colours::black.withAlpha (0.25f + 0.65f * t));
+            g.fillPath (iris);
+
+            // pulsing danger rim, in chunky pixel squares
+            const int dots = 48;
+            const float dotSize = 6.0f;
+            g.setColour (hotRed.withAlpha (0.25f + 0.6f * t * (0.5f + 0.5f * currentFlash)));
+            for (int i = 0; i < dots; ++i)
+            {
+                const float a = MathConstants<float>::twoPi * (float) i / (float) dots + flashPhase * 0.4f;
+                auto p = centre.getPointOnCircumference (rad, a);
+                g.fillRect (Rectangle<float> (dotSize, dotSize).withCentre (p).toNearestInt().toFloat());
+            }
+        }
 
         if (boomText > 0.0f)
         {
