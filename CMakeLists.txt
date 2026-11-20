@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 
-project(DropFuse VERSION 1.0.0)
+project(DropTNT VERSION 2.0.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,13 +26,13 @@ else()
     set(RIOT_FORMATS VST3 Standalone)
 endif()
 
-juce_add_plugin(DropFuse
+juce_add_plugin(DropTNT
     COMPANY_NAME                "RiotAudio"
-    BUNDLE_ID                   "com.riotaudio.dropfuse"
+    BUNDLE_ID                   "com.riotaudio.droptnt"
     PLUGIN_MANUFACTURER_CODE    Riot
-    PLUGIN_CODE                 Dfus
+    PLUGIN_CODE                 Dtnt
     FORMATS                     ${RIOT_FORMATS}
-    PRODUCT_NAME                "Drop Fuse"
+    PRODUCT_NAME                "Drop TNT"
     IS_SYNTH                    FALSE
     NEEDS_MIDI_INPUT            FALSE
     NEEDS_MIDI_OUTPUT           FALSE
@@ -40,17 +40,17 @@ juce_add_plugin(DropFuse
     AU_MAIN_TYPE                kAudioUnitType_Effect
     COPY_PLUGIN_AFTER_BUILD     ${RIOT_COPY_AFTER_BUILD})
 
-target_sources(DropFuse PRIVATE
+target_sources(DropTNT PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp)
 
-target_compile_definitions(DropFuse PUBLIC
+target_compile_definitions(DropTNT PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0)
 
-target_link_libraries(DropFuse
+target_link_libraries(DropTNT
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp

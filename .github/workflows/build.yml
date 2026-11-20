@@ -23,10 +23,10 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R "build-release/DropFuse_artefacts/Release/AU/Drop Fuse.component" ~/Library/Audio/Plug-Ins/Components/
+          cp -R "build-release/DropTNT_artefacts/Release/AU/Drop TNT.component" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           sleep 3
-          auval -v aufx Dfus Riot | tail -20
+          auval -v aufx Dtnt Riot | tail -20
 
       - uses: actions/upload-artifact@v4
         with:
@@ -41,13 +41,13 @@ jobs:
       - name: Build VST3
         run: |
           cmake -B build-win -A x64 -DRIOT_COPY_AFTER_BUILD=OFF
-          cmake --build build-win --config Release --target DropFuse_VST3 --parallel
+          cmake --build build-win --config Release --target DropTNT_VST3 --parallel
 
       - name: Make setup.exe + portable zip
         run: |
           choco install innosetup -y --no-progress
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\windows.iss
-          Compress-Archive -Path "build-win/DropFuse_artefacts/Release/VST3/Drop Fuse.vst3" -DestinationPath dist/DropFuse-1.0.0-win-vst3.zip
+          Compress-Archive -Path "build-win/DropTNT_artefacts/Release/VST3/Drop TNT.vst3" -DestinationPath dist/DropTNT-2.0.0-win-vst3.zip
 
       - uses: actions/upload-artifact@v4
         with:
@@ -70,5 +70,5 @@ jobs:
           ls -la out
           gh release create "build-${{ github.run_number }}" out/* \
             --repo "${{ github.repository }}" \
-            --title "Drop Fuse (build ${{ github.run_number }})" \
+            --title "Drop TNT (build ${{ github.run_number }})" \
             --notes "Mac: download the .pkg and double-click (AU for Logic + VST3). Windows: run the setup.exe (installs VST3 to C:\\Program Files\\Common Files\\VST3), or unzip the .vst3 manually."

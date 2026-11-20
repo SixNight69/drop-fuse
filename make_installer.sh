@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build Drop Fuse and package it as a macOS .pkg installer (AU + VST3).
+# Build Drop TNT and package it as a macOS .pkg installer (AU + VST3).
 #
 #   ./make_installer.sh                    -> unsigned .pkg (for your own Macs)
 #
@@ -12,9 +12,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-NAME="Drop Fuse"
-VERSION="1.0.0"
-BUNDLE_ID="com.riotaudio.dropfuse"
+NAME="Drop TNT"
+VERSION="2.0.0"
+BUNDLE_ID="com.riotaudio.droptnt"
 DEV_APP_ID="${DEV_APP_ID:-}"
 DEV_INSTALLER_ID="${DEV_INSTALLER_ID:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
@@ -22,13 +22,13 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 BUILD=build-release
 OUT=dist
 WORK="$BUILD/pkgwork"
-PKG_OUT="$OUT/DropFuse-$VERSION-mac.pkg"
+PKG_OUT="$OUT/DropTNT-$VERSION-mac.pkg"
 
 echo "==> Building ($NAME $VERSION)"
 cmake -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DRIOT_COPY_AFTER_BUILD=OFF
 cmake --build "$BUILD" --config Release -j8
 
-ART="$BUILD/DropFuse_artefacts/Release"
+ART="$BUILD/DropTNT_artefacts/Release"
 AU="$ART/AU/$NAME.component"
 VST3="$ART/VST3/$NAME.vst3"
 [ -d "$AU" ]   || { echo "AU not found: $AU"; exit 1; }
@@ -53,6 +53,8 @@ fi
 # After install, make macOS rescan Audio Units so Logic sees the plugin right away
 cat > "$WORK/scripts-au/postinstall" <<'EOF'
 #!/bin/sh
+# remove the old v1 plugin (Drop Fuse) so Logic doesn't show both
+rm -rf "/Library/Audio/Plug-Ins/Components/Drop Fuse.component" "/Library/Audio/Plug-Ins/VST3/Drop Fuse.vst3"
 killall -9 AudioComponentRegistrar >/dev/null 2>&1 || true
 exit 0
 EOF

@@ -101,7 +101,7 @@ void PixelLookAndFeel::drawRotarySlider (Graphics& g, int x, int y, int w, int h
 }
 
 //==============================================================================
-DropFuseEditor::DropFuseEditor (DropFuseProcessor& p)
+DropTNTEditor::DropTNTEditor (DropTNTProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
     setLookAndFeel (&lnf);
@@ -119,13 +119,13 @@ DropFuseEditor::DropFuseEditor (DropFuseProcessor& p)
     startTimerHz (60);
 }
 
-DropFuseEditor::~DropFuseEditor()
+DropTNTEditor::~DropTNTEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
 }
 
-void DropFuseEditor::resized()
+void DropTNTEditor::resized()
 {
     auto area = getLocalBounds();
     area.removeFromTop (56);
@@ -135,16 +135,17 @@ void DropFuseEditor::resized()
     readoutArea = area.removeFromTop (34).reduced (20, 0);
     buildArea = area.reduced (20, 10);
     buildSlider.setBounds (buildArea.withSizeKeepingCentre (170, 170));
+    rebuildBackground();
 }
 
 //==============================================================================
-int DropFuseEditor::burnedFuseRows() const
+int DropTNTEditor::burnedFuseRows() const
 {
     // fuse burns down as Build rises (always leaves the last pixel lit)
     return jlimit (0, fuseRows - 1, (int) (build * fuseRows));
 }
 
-DropFuseEditor::Geometry DropFuseEditor::getGeometry() const
+DropTNTEditor::Geometry DropTNTEditor::getGeometry() const
 {
     // swells as it gets close to blowing, pops back in after respawn
     const float swell = 1.0f + 0.10f * build * build + 0.03f * currentFlash;
@@ -163,7 +164,7 @@ DropFuseEditor::Geometry DropFuseEditor::getGeometry() const
     return geo;
 }
 
-void DropFuseEditor::explode()
+void DropTNTEditor::explode()
 {
     hiddenTime  = 1.1f;
     screenFlash = 1.0f;
@@ -204,7 +205,7 @@ void DropFuseEditor::explode()
     }
 }
 
-void DropFuseEditor::timerCallback()
+void DropTNTEditor::timerCallback()
 {
     build = jlimit (0.0f, 1.0f, buildParam->load() / 100.0f);
 
@@ -261,14 +262,23 @@ void DropFuseEditor::timerCallback()
     particles.erase (std::remove_if (particles.begin(), particles.end(),
                                      [] (const Particle& pt) { return pt.life <= 0.0f; }),
                      particles.end());
-    if (particles.size() > 1500)
-        particles.erase (particles.begin(), particles.begin() + (long) (particles.size() - 1500));
+    if (particles.size() > 600)
+        particles.erase (particles.begin(), particles.begin() + (long) (particles.size() - 600));
 
-    repaint();
+    // only redraw when something is actually moving (idle GUI = ~0 CPU)
+    const bool animating = build > 0.001f || ! particles.empty() || screenFlash > 0.0f || boomText > 0.0f
+                           || hiddenTime > 0.0f || respawn < 1.0f || boomShake > 0.0f;
+    const int div = processor.displayDivision.load();
+    if (animating || std::abs (build - lastPaintedBuild) > 1.0e-4f || div != lastPaintedDivision)
+    {
+        lastPaintedBuild = build;
+        lastPaintedDivision = div;
+        repaint();
+    }
 }
 
 //==============================================================================
-void DropFuseEditor::drawSky (Graphics& g)
+void DropTNTEditor::drawSky (Graphics& g)
 {
     // night sky in coarse colour bands (pixel gradient)
     const Colour top (0xff121a33), bottom (0xff2b2350);
@@ -279,15 +289,6 @@ void DropFuseEditor::drawSky (Graphics& g)
         g.setColour (top.interpolatedWith (bottom, (float) i / (bands - 1)));
         g.fillRect (Rectangle<float> ((float) sceneArea.getX(), (float) sceneArea.getY() + bandH * (float) i,
                                       (float) sceneArea.getWidth(), bandH + 1.0f));
-    }
-
-    // red glow builds up behind the dynamite
-    if (build > 0.0f && hiddenTime <= 0.0f)
-    {
-        const auto c = Point<float> ((float) sceneArea.getCentreX(), groundY - 70.0f);
-        g.setGradientFill (ColourGradient (hotRed.withAlpha (0.35f * build * build), c.x, c.y,
-                                           hotRed.withAlpha (0.0f), c.x + 260.0f, c.y, true));
-        g.fillRect (sceneArea);
     }
 
     Random starRng (1234);
@@ -301,7 +302,7 @@ void DropFuseEditor::drawSky (Graphics& g)
     }
 }
 
-void DropFuseEditor::drawGround (Graphics& g)
+void DropTNTEditor::drawGround (Graphics& g)
 {
     const float p = basePixel;
     const int cols = (int) std::ceil ((float) sceneArea.getWidth() / p);
@@ -317,19 +318,23 @@ void DropFuseEditor::drawGround (Graphics& g)
             else if (r == 1) col = n < 0.5f ? Colour (0xff4c9a2a) : Colour (0xff7a5536);
             else             col = n < 0.2f ? Colour (0xff5e3f27) : n < 0.35f ? Colour (0xff8a6342) : Colour (0xff7a5536);
             g.setColour (col);
-            g.fillRect (Rectangle<float> ((float) sceneArea.getX() + (float) c * p + shakeOffset.x * 0.3f,
+            g.fillRect (Rectangle<float> ((float) sceneArea.getX() + (float) c * p,
                                           groundY + (float) r * p, p, p));
         }
-
-    // scorch mark after the blast
-    if (hiddenTime > 0.0f)
-    {
-        g.setColour (Colours::black.withAlpha (0.45f));
-        g.fillRect (Rectangle<float> (12.0f * p, p).withCentre ({ (float) sceneArea.getCentreX(), groundY + p * 0.5f }));
-    }
 }
 
-void DropFuseEditor::drawDynamite (Graphics& g, const Geometry& geo, float flash, float alpha)
+void DropTNTEditor::rebuildBackground()
+{
+    // sky, stars and ground never change: draw them once (at 2x for sharp pixels on Retina)
+    constexpr float scale = 2.0f;
+    background = Image (Image::RGB, sceneArea.getWidth() * (int) scale, sceneArea.getHeight() * (int) scale, true);
+    Graphics bg (background);
+    bg.addTransform (AffineTransform::translation ((float) -sceneArea.getX(), (float) -sceneArea.getY()).scaled (scale));
+    drawSky (bg);
+    drawGround (bg);
+}
+
+void DropTNTEditor::drawDynamite (Graphics& g, const Geometry& geo, float flash, float alpha)
 {
     const int burned = burnedFuseRows();
     for (int r = 0; r < artH; ++r)
@@ -358,7 +363,7 @@ void DropFuseEditor::drawDynamite (Graphics& g, const Geometry& geo, float flash
     }
 }
 
-void DropFuseEditor::drawParticles (Graphics& g)
+void DropTNTEditor::drawParticles (Graphics& g)
 {
     for (const auto& pt : particles)
     {
@@ -369,18 +374,18 @@ void DropFuseEditor::drawParticles (Graphics& g)
     }
 }
 
-void DropFuseEditor::drawReadout (Graphics& g)
+void DropTNTEditor::drawReadout (Graphics& g)
 {
     const int div = processor.displayDivision.load();
     const float cut = processor.displayCutoff.load();
-    const float semis = processor.displaySemis.load();
+    const float rev = processor.displayReverb.load();
     const float width = processor.displayWidth.load();
 
     auto cutText = cut >= 1000.0f ? String (cut / 1000.0f, 2) + "kHz" : String (roundToInt (cut)) + "Hz";
     auto items = StringArray {
-        String ("GATE ") + DropFuseProcessor::divisionName (div),
+        String ("GATE ") + DropTNTProcessor::divisionName (div),
         "LOW CUT " + cutText,
-        "PITCH +" + String (semis, 1) + "st",
+        "REVERB " + String (roundToInt (rev * 100.0f)) + "%",
         "WIDTH " + String (roundToInt (width * 100.0f)) + "%"
     };
 
@@ -397,16 +402,16 @@ void DropFuseEditor::drawReadout (Graphics& g)
     }
 }
 
-void DropFuseEditor::paint (Graphics& g)
+void DropTNTEditor::paint (Graphics& g)
 {
     g.fillAll (bgDark);
 
     // header
     g.setFont (PixelLookAndFeel::pixelFont (28.0f));
     g.setColour (Colours::black);
-    g.drawText ("DROP FUSE", 23, 13, 300, 34, Justification::centredLeft);
+    g.drawText ("DROP TNT", 23, 13, 300, 34, Justification::centredLeft);
     g.setColour (Colours::white);
-    g.drawText ("DROP FUSE", 20, 10, 300, 34, Justification::centredLeft);
+    g.drawText ("DROP TNT", 20, 10, 300, 34, Justification::centredLeft);
     g.setFont (PixelLookAndFeel::pixelFont (12.0f));
     g.setColour (textDim);
     g.drawText ("build-up macro // draw automation 0 -> 100, pull to 0 at the drop",
@@ -416,8 +421,25 @@ void DropFuseEditor::paint (Graphics& g)
     {
         Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (sceneArea);
-        drawSky (g);
-        drawGround (g);
+        g.setImageResamplingQuality (Graphics::lowResamplingQuality);
+        g.drawImage (background, sceneArea.toFloat());
+
+        // red glow builds up behind the dynamite
+        if (build > 0.0f && hiddenTime <= 0.0f)
+        {
+            const auto c = Point<float> ((float) sceneArea.getCentreX(), groundY - 70.0f);
+            g.setGradientFill (ColourGradient (hotRed.withAlpha (0.35f * build * build), c.x, c.y,
+                                               hotRed.withAlpha (0.0f), c.x + 260.0f, c.y, true));
+            g.fillRect (sceneArea.withBottom ((int) groundY));
+        }
+
+        // scorch mark after the blast
+        if (hiddenTime > 0.0f)
+        {
+            g.setColour (Colours::black.withAlpha (0.45f));
+            g.fillRect (Rectangle<float> (12.0f * basePixel, basePixel)
+                            .withCentre ({ (float) sceneArea.getCentreX(), groundY + basePixel * 0.5f }));
+        }
         if (hiddenTime <= 0.0f)
             drawDynamite (g, getGeometry(), currentFlash, respawn);
         drawParticles (g);

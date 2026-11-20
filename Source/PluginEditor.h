@@ -13,11 +13,11 @@ public:
     static juce::Font pixelFont (float size);
 };
 
-class DropFuseEditor : public juce::AudioProcessorEditor, private juce::Timer
+class DropTNTEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    explicit DropFuseEditor (DropFuseProcessor&);
-    ~DropFuseEditor() override;
+    explicit DropTNTEditor (DropTNTProcessor&);
+    ~DropTNTEditor() override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -30,6 +30,7 @@ private:
     Geometry getGeometry() const;
     int  burnedFuseRows() const;
 
+    void rebuildBackground();
     void drawSky (juce::Graphics&);
     void drawGround (juce::Graphics&);
     void drawDynamite (juce::Graphics&, const Geometry&, float flash, float alpha);
@@ -44,7 +45,7 @@ private:
     };
 
     PixelLookAndFeel lnf;              // destroyed last
-    DropFuseProcessor& processor;
+    DropTNTProcessor& processor;
     std::atomic<float>* buildParam = nullptr;
 
     juce::Slider buildSlider;
@@ -65,6 +66,9 @@ private:
     float respawn = 1.0f;
     float boomText = 0.0f;
     juce::Point<float> shakeOffset;
+    juce::Image background;
+    float lastPaintedBuild = -1.0f;
+    int   lastPaintedDivision = -2;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DropFuseEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DropTNTEditor)
 };
