@@ -131,11 +131,12 @@ void DropTNTEditor::resized()
 {
     auto area = getLocalBounds();
     area.removeFromTop (56);
-    sceneArea = area.removeFromTop (280);
-    groundY = (float) sceneArea.getBottom() - 48.0f;
+    sceneArea = area;                                       // scene fills everything below the title
+    groundY = (float) sceneArea.getBottom() - 45.0f;        // grass line near the bottom
 
-    buildArea = area.reduced (20, 12);
-    buildSlider.setBounds (buildArea.withSizeKeepingCentre (140, 140).withY (buildArea.getY()));
+    // knob floats over the scene, bottom-right; percentage sits under it on the ground
+    constexpr int knobSize = 120;
+    buildSlider.setBounds (sceneArea.getRight() - knobSize - 24, (int) groundY - knobSize - 4, knobSize, knobSize);
     rebuildBackground();
 }
 
@@ -433,7 +434,7 @@ void DropTNTEditor::paint (Graphics& g)
         {
             const auto geo = getGeometry();
             const auto centre = geo.topLeft + Point<float> (geo.width * 0.5f, artH * geo.pxY * 0.5f);
-            const float maxR = 520.0f, minR = artH * geo.pxY * 0.68f;
+            const float maxR = 640.0f, minR = artH * geo.pxY * 0.68f;
             const float t = std::pow (build, 0.9f);
             const float rad = maxR + (minR - maxR) * t;
 
@@ -467,15 +468,14 @@ void DropTNTEditor::paint (Graphics& g)
             g.drawText ("DROP!", r, Justification::centred);
         }
     }
-    g.setColour (Colours::black);
-    g.drawRect (sceneArea, 3);
-
     // value under the knob: 0% - 100%
     const int value = roundToInt (build * 100.0f);
+    auto valueArea = buildSlider.getBounds().withY (buildSlider.getBottom() + 4).withHeight (36);
     g.setFont (PixelLookAndFeel::pixelFont (26.0f));
-    g.setColour (value > 85 ? hotRed : value > 50 ? Colour (0xffffd60a) : Colours::white.withAlpha (0.85f));
-    g.drawText (String (value) + "%", buildSlider.getBounds().withY (buildSlider.getBottom() + 2).withHeight (32),
-                Justification::centred);
+    g.setColour (Colours::black.withAlpha (0.8f));
+    g.drawText (String (value) + "%", valueArea.translated (2, 2), Justification::centred);
+    g.setColour (value > 85 ? hotRed : value > 50 ? Colour (0xffffd60a) : Colours::white);
+    g.drawText (String (value) + "%", valueArea, Justification::centred);
 
     if (screenFlash > 0.0f)
     {

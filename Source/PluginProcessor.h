@@ -5,7 +5,7 @@
 
 // Drop TNT v3: one "Build" knob (0-100). Everything squeezes into a point, then explodes.
 //   Build up  -> low cut sweeps up (thin, piercing), crunch distortion drives harder,
-//                tempo gate 1/4 -> 1/8 -> 1/16 (gentle, level-compensated),
+//                tempo gate 1/4 -> 1/8 -> 1/16 -> 1/32 (gentle, level-compensated),
 //                DJ-style echo: time shrinks 1/2 beat -> a few ms with rising feedback
 //                (pitch glides up into a sharp resonant buzz), room shrinks from big to tiny,
 //                compressor squashes harder, stereo collapses to mono.
@@ -81,7 +81,7 @@ private:
     float echoHpCoeff = 0.97f;
 
 
-    // gate (1/4 -> 1/8 -> 1/16, gentle depth, level-compensated)
+    // gate (1/4 -> 1/32, gentle depth, level-compensated)
     float gateGain = 1.0f, gateCoeff = 0.99f;
 
     // compressor ("squash")

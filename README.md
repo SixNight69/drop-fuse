@@ -1,4 +1,4 @@
-# Drop TNT v3.2 — Build-up 蓄力巨集（AU / VST3）
+# Drop TNT v3.3 — Build-up 蓄力巨集（AU / VST3）
 
 一顆 **BUILD 0–100** 旋鈕。往上推是蓄力，拉回 0 就是 drop。
 
@@ -11,6 +11,10 @@
 | 85–100 | +20 dB 最髒 | 到 1.8 kHz | 幾毫秒 → 尖銳嗡鳴 | 極小 | 8:1 | 單聲道 |
 
 **拉回 0 = drop**：所有東西一次放開。
+
+### v3.3
+- Gate 範圍改成 1/4 → 1/8 → 1/16 → 1/32
+- 場景填滿整個視窗，草地在最下方；旋鈕浮在右下角、疊在畫面上層
 
 ### v3.2
 - Gate 回來：1/4 → 1/8 → 1/16（不超過 1/16），深度溫和漸進＋音量補償，0–100 音量維持在約 ±1.5 dB
@@ -42,8 +46,8 @@
 
 ## 安裝
 到 GitHub 的 **Releases** 下載：
-- Mac：`DropTNT-3.2.0-mac.pkg` → 雙擊安裝（AU + VST3）
-- Windows：`DropTNT-3.2.0-win-setup.exe`（VST3，Ableton / FL Studio / Cubase）
+- Mac：`DropTNT-3.3.0-mac.pkg` → 雙擊安裝（AU + VST3）
+- Windows：`DropTNT-3.3.0-win-setup.exe`（VST3，Ableton / FL Studio / Cubase）
 
 第一次開啟若被擋：Mac → 系統設定 › 隱私權與安全性 › 仍要打開；Windows → 其他資訊 › 仍要執行。
 
@@ -51,5 +55,5 @@
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j8
-./make_installer.sh     # 產生 dist/DropTNT-3.2.0-mac.pkg
+./make_installer.sh     # 產生 dist/DropTNT-3.3.0-mac.pkg
 ```

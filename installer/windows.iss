@@ -1,5 +1,5 @@
 ; Inno Setup script: Drop TNT VST3 installer for Windows (Ableton Live, FL Studio, Cubase, ...)
-#define AppVer "3.2.0"
+#define AppVer "3.3.0"
 
 [Setup]
 AppId={{6E1B7C52-3F7A-4D2B-9C1E-DF05E0A1F002}

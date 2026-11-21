@@ -13,7 +13,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 NAME="Drop TNT"
-VERSION="3.2.0"
+VERSION="3.3.0"
 BUNDLE_ID="com.riotaudio.droptnt"
 DEV_APP_ID="${DEV_APP_ID:-}"
 DEV_INSTALLER_ID="${DEV_INSTALLER_ID:-}"

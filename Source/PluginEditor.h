@@ -56,7 +56,7 @@ private:
     juce::Slider buildSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> buildAttachment;
 
-    juce::Rectangle<int> sceneArea, buildArea;
+    juce::Rectangle<int> sceneArea;
     float groundY = 0.0f;
 
     std::vector<Particle> particles;

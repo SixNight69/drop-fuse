@@ -194,9 +194,9 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
             const float driveMix = ramp (b, 0.0f, 0.10f);              // fades in, no jump at the start
             const float driveComp = 1.0f / (0.7f * std::tanh (drive * 0.35f) / 0.35f + 0.3f * jmin (drive, 1.0f / 0.35f));
 
-            // gate: 1/4 -> 1/8 -> 1/16 across 0-100, depth grows gently, open part compensated
+            // gate: 1/4 -> 1/8 -> 1/16 -> 1/32 across 0-100, depth grows gently, open part compensated
             const bool   gateOn = b >= 0.02f;
-            const double gateDiv = b < 0.34f ? 1.0 : b < 0.67f ? 0.5 : 0.25;
+            const double gateDiv = b < 0.25f ? 1.0 : b < 0.50f ? 0.5 : b < 0.75f ? 0.25 : 0.125;
             const float  gateDepth = 0.8f * std::pow (ramp (b, 0.02f, 0.70f), 1.3f);
             const float  gateEnergy = 0.5f + 0.5f * (1.0f - gateDepth) * (1.0f - gateDepth);
             const float  gateComp = std::pow (gateEnergy, -0.35f);
