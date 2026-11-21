@@ -45,7 +45,6 @@ namespace
     }
 
     const Colour bgDark   { 0xff0e1116 };
-    const Colour xpGreen  { 0xff7ed321 };
     const Colour hotRed   { 0xffff3b30 };
     const Colour textDim  { 0xff8a93a6 };
 }
@@ -68,68 +67,39 @@ Font PixelLookAndFeel::getLabelFont (Label&) { return pixelFont (13.0f); }
 void PixelLookAndFeel::drawRotarySlider (Graphics& g, int x, int y, int w, int h,
                                          float pos, float startAngle, float endAngle, Slider&)
 {
-    const auto area = Rectangle<int> (x, y, w, h).toFloat().reduced (6.0f);
+    const auto area = Rectangle<int> (x, y, w, h).toFloat().reduced (4.0f);
     const float r = jmin (area.getWidth(), area.getHeight()) * 0.5f;
     const auto c = area.getCentre();
-
-    // chunky pixel ring: 16 square segments
-    const int segs = r > 50.0f ? 28 : 16;
-    const int lit = roundToInt (pos * (float) segs);
-    const float sq = jmax (4.0f, r * (r > 50.0f ? 0.13f : 0.22f));
-    for (int i = 0; i < segs; ++i)
-    {
-        const float a = startAngle + (endAngle - startAngle) * ((float) i + 0.5f) / (float) segs;
-        auto p = c.getPointOnCircumference (r - sq * 0.6f, a);
-        auto rect = Rectangle<float> (sq, sq).withCentre (p).toNearestInt().toFloat();
-        g.setColour (i < lit ? i < segs / 2 ? xpGreen.interpolatedWith (Colour (0xffffd60a), 2.0f * (float) i / (float) segs)
-                                    : Colour (0xffffd60a).interpolatedWith (hotRed, 2.0f * (float) i / (float) segs - 1.0f) : Colour (0xff2a2f38));
-        g.fillRect (rect);
-    }
-
+    const float rb = r * 0.74f;                        // knob body radius
     const float ang = startAngle + pos * (endAngle - startAngle);
 
-    if (r > 50.0f)
-    {
-        // big BUILD knob: the face is our pixel dynamite bundle, heating up as it turns
-        const float kb = r * 1.0f;
-        auto body = Rectangle<float> (kb, kb).withCentre (c).toNearestInt().toFloat();
-        g.setColour (Colour (0xff1a1d24)); g.fillRect (body);
-        g.setColour (Colour (0xff3a3f4a)); g.drawRect (body, 3.0f);
+    // reference tick: one line at the zero position (lower-left)
+    g.setColour (Colours::white.withAlpha (0.75f));
+    g.drawLine (Line<float> (c.getPointOnCircumference (rb + 5.0f, startAngle),
+                             c.getPointOnCircumference (r - 1.0f, startAngle)), 3.0f);
 
-        const float px = std::floor (kb * 0.86f / (float) artW);
-        const auto tl = Point<float> (c.x - artW * px * 0.5f, c.y - artH * px * 0.5f + px * 0.5f);
-        for (int row = 0; row < artH; ++row)
-            for (int col = 0; col < artW; ++col)
-            {
-                const char ch = dynamiteArt[row][col];
-                if (ch == '.') continue;
-                auto colr = artColour (ch);
-                if (ch != 'F') colr = colr.interpolatedWith (Colour (0xffffe0a0), pos * pos * 0.45f);
-                g.setColour (colr);
-                g.fillRect (Rectangle<float> (tl.x + (float) col * px, tl.y + (float) row * px, px, px));
-            }
+    // shadow
+    g.setColour (Colours::black.withAlpha (0.5f));
+    g.fillEllipse (Rectangle<float> (rb * 2.0f, rb * 2.0f).withCentre (c.translated (0.0f, 4.0f)));
 
-        // pointer: a hot spark riding the ring
-        auto tip = c.getPointOnCircumference (r - sq * 0.6f, ang);
-        const float ts = sq * 1.5f;
-        g.setColour (Colour (0xffffd60a));
-        g.fillRect (Rectangle<float> (ts, ts).withCentre (tip).toNearestInt().toFloat());
-        g.setColour (Colours::white);
-        g.fillRect (Rectangle<float> (ts * 0.5f, ts * 0.5f).withCentre (tip).toNearestInt().toFloat());
-        return;
-    }
+    // body: dark metal with a soft top light
+    auto body = Rectangle<float> (rb * 2.0f, rb * 2.0f).withCentre (c);
+    g.setGradientFill (ColourGradient (Colour (0xff4a4f5a), c.x, c.y - rb,
+                                       Colour (0xff15171c), c.x, c.y + rb, false));
+    g.fillEllipse (body);
+    g.setColour (Colour (0xff626875));
+    g.drawEllipse (body.reduced (1.0f), 2.0f);
 
-    // small knobs: plain square body
-    const float kb = r * 0.95f;
-    auto body = Rectangle<float> (kb, kb).withCentre (c).toNearestInt().toFloat();
-    g.setColour (Colour (0xff3a3f4a)); g.fillRect (body);
-    g.setColour (Colour (0xff555b68)); g.fillRect (body.removeFromTop (3.0f));
-    g.setColour (Colour (0xff1c1f26)); g.fillRect (body.removeFromBottom (3.0f));
+    // inner cap
+    auto cap = body.reduced (rb * 0.18f);
+    g.setGradientFill (ColourGradient (Colour (0xff2c3038), c.x, cap.getY(),
+                                       Colour (0xff1c1f25), c.x, cap.getBottom(), false));
+    g.fillEllipse (cap);
 
-    auto tip = c.getPointOnCircumference (kb * 0.36f, ang);
-    g.setColour (Colours::white);
-    const float ts = jmax (5.0f, r * 0.12f);
-    g.fillRect (Rectangle<float> (ts, ts).withCentre (tip).toNearestInt().toFloat());
+    // pointer line (heats from white to red as it turns)
+    g.setColour (Colours::white.interpolatedWith (hotRed, pos));
+    g.drawLine (Line<float> (c.getPointOnCircumference (rb * 0.30f, ang),
+                             c.getPointOnCircumference (rb * 0.92f, ang)), 4.0f);
 }
 
 //==============================================================================
@@ -164,9 +134,8 @@ void DropTNTEditor::resized()
     sceneArea = area.removeFromTop (280);
     groundY = (float) sceneArea.getBottom() - 48.0f;
 
-    readoutArea = area.removeFromTop (34).reduced (20, 0);
-    buildArea = area.reduced (20, 10);
-    buildSlider.setBounds (buildArea.withSizeKeepingCentre (170, 170));
+    buildArea = area.reduced (20, 12);
+    buildSlider.setBounds (buildArea.withSizeKeepingCentre (140, 140).withY (buildArea.getY()));
     rebuildBackground();
 }
 
@@ -179,20 +148,35 @@ int DropTNTEditor::burnedFuseRows() const
 
 DropTNTEditor::Geometry DropTNTEditor::getGeometry() const
 {
-    // swells as it gets close to blowing, pops back in after respawn
-    const float swell = 1.0f + 0.10f * build * build + 0.03f * currentFlash;
-    const float px = basePixel * swell * (0.6f + 0.4f * respawn);
+    const float sq = std::pow (build, 1.2f);                    // squeeze amount
+    const float base = basePixel * 1.1f * (0.6f + 0.4f * respawn);
 
     Geometry geo;
-    geo.px = px;
-    geo.topLeft = { (float) sceneArea.getCentreX() - artW * px * 0.5f + shakeOffset.x,
-                    groundY - artH * px + shakeOffset.y };
+    geo.px = base;
+    geo.pxY = base * (1.0f + 0.14f * sq + 0.03f * currentFlash); // pushed taller as it is crushed
+
+    // gaps between sticks close first, then the sticks themselves get thinner
+    const float gapW   = base * (1.0f - sq);
+    const float stickW = base * (1.0f - 0.30f * sq);
+    float x = 0.0f;
+    for (int c = 0; c < artW; ++c)
+    {
+        geo.colX[(size_t) c] = x;
+        const bool gap = (c == 0 || c == 6 || c == 7 || c == 13 || c == 14 || c == 20);
+        x += gap ? gapW : stickW;
+    }
+    geo.colX[(size_t) artW] = x;
+    geo.width = x;
+
+    geo.topLeft = { (float) sceneArea.getCentreX() - x * 0.5f + shakeOffset.x,
+                    groundY - artH * geo.pxY + shakeOffset.y };
 
     const int row = burnedFuseRows();
     int col = 10;
     for (int c = 0; c < artW; ++c)
         if (dynamiteArt[row][c] == 'F') { col = c; break; }
-    geo.sparkPos = geo.topLeft + Point<float> (((float) col + 0.5f) * px, ((float) row + 0.3f) * px);
+    const float cx = 0.5f * (geo.colX[(size_t) col] + geo.colX[(size_t) col + 1]);
+    geo.sparkPos = geo.topLeft + Point<float> (cx, ((float) row + 0.3f) * geo.pxY);
     return geo;
 }
 
@@ -205,7 +189,7 @@ void DropTNTEditor::explode()
     peak        = 0.0f;
 
     const auto geo = getGeometry();
-    const auto centre = geo.topLeft + Point<float> (artW * geo.px * 0.5f, artH * geo.px * 0.55f);
+    const auto centre = geo.topLeft + Point<float> (geo.width * 0.5f, artH * geo.pxY * 0.55f);
     const Colour palette[] = { Colours::white, Colour (0xffe0e0e0), Colour (0xffa0a0a0),
                                Colour (0xff5c5c5c), Colour (0xffffc107), Colour (0xffff6f00),
                                Colour (0xffd62f2f), Colour (0xffe8d3a2) };
@@ -377,8 +361,10 @@ void DropTNTEditor::drawDynamite (Graphics& g, const Geometry& geo, float flash,
             auto col = artColour (ch);
             if (ch != 'F') col = col.interpolatedWith (Colours::white, flash);
             g.setColour (col.withMultipliedAlpha (alpha));
-            g.fillRect (Rectangle<float> (geo.topLeft.x + (float) c * geo.px, geo.topLeft.y + (float) r * geo.px,
-                                          geo.px + 0.5f, geo.px + 0.5f));
+            const float cw = geo.colX[(size_t) c + 1] - geo.colX[(size_t) c];
+            if (cw < 0.3f) continue;
+            g.fillRect (Rectangle<float> (geo.topLeft.x + geo.colX[(size_t) c], geo.topLeft.y + (float) r * geo.pxY,
+                                          cw + 0.5f, geo.pxY + 0.5f));
         }
     }
 
@@ -404,36 +390,6 @@ void DropTNTEditor::drawParticles (Graphics& g)
     }
 }
 
-void DropTNTEditor::drawReadout (Graphics& g)
-{
-    const float crunchDb = processor.displayCrunchDb.load();
-    const float cut = processor.displayCutoff.load();
-    const float echoBeats = processor.displayEchoBeats.load();
-    const float ratio = processor.displayRatio.load();
-    auto echoText = echoBeats <= 0.0f ? String ("OFF")
-                                      : "1/" + String (roundToInt (1.0f / echoBeats));
-
-    auto cutText = cut >= 1000.0f ? String (cut / 1000.0f, 2) + "kHz" : String (roundToInt (cut)) + "Hz";
-    auto items = StringArray {
-        crunchDb < 0.5f ? String ("CRUNCH OFF") : "CRUNCH +" + String (roundToInt (crunchDb)) + "dB",
-        "LOW CUT " + cutText,
-        "ECHO " + echoText,
-        "SQUASH " + String (ratio, 1) + ":1"
-    };
-
-    auto area = readoutArea;
-    const int w = area.getWidth() / items.size();
-    g.setFont (PixelLookAndFeel::pixelFont (14.0f));
-    for (int i = 0; i < items.size(); ++i)
-    {
-        auto cell = area.removeFromLeft (w);
-        g.setColour (Colour (0xff181c24));
-        g.fillRect (cell.reduced (3, 4));
-        g.setColour (i == 0 && crunchDb >= 0.5f ? Colour (0xffffd60a) : Colours::white.withAlpha (0.8f));
-        g.drawText (items[i], cell, Justification::centred);
-    }
-}
-
 void DropTNTEditor::paint (Graphics& g)
 {
     g.fillAll (bgDark);
@@ -444,10 +400,6 @@ void DropTNTEditor::paint (Graphics& g)
     g.drawText ("DROP TNT", 23, 13, 300, 34, Justification::centredLeft);
     g.setColour (Colours::white);
     g.drawText ("DROP TNT", 20, 10, 300, 34, Justification::centredLeft);
-    g.setFont (PixelLookAndFeel::pixelFont (12.0f));
-    g.setColour (textDim);
-    g.drawText ("squeeze it to a point // pull to 0 at the drop",
-                getLocalBounds().withHeight (56).reduced (20, 0), Justification::centredRight);
 
     // scene
     {
@@ -480,8 +432,8 @@ void DropTNTEditor::paint (Graphics& g)
         if (build > 0.02f && hiddenTime <= 0.0f)
         {
             const auto geo = getGeometry();
-            const auto centre = geo.topLeft + Point<float> (artW * geo.px * 0.5f, artH * geo.px * 0.5f);
-            const float maxR = 520.0f, minR = artW * geo.px * 0.62f;
+            const auto centre = geo.topLeft + Point<float> (geo.width * 0.5f, artH * geo.pxY * 0.5f);
+            const float maxR = 520.0f, minR = artH * geo.pxY * 0.68f;
             const float t = std::pow (build, 0.9f);
             const float rad = maxR + (minR - maxR) * t;
 
@@ -518,22 +470,12 @@ void DropTNTEditor::paint (Graphics& g)
     g.setColour (Colours::black);
     g.drawRect (sceneArea, 3);
 
-    drawReadout (g);
-
-    // build value
+    // value under the knob: 0% - 100%
     const int value = roundToInt (build * 100.0f);
-    g.setFont (PixelLookAndFeel::pixelFont (24.0f));
-    g.setColour (value > 85 ? hotRed : value > 50 ? Colour (0xffffd60a) : xpGreen);
-    auto knobBounds = buildSlider.getBounds();
-    auto left  = buildArea.withRight (knobBounds.getX() - 20);
-    auto right = buildArea.withLeft (knobBounds.getRight() + 20);
-    g.drawText ("BUILD", left.withTrimmedBottom (left.getHeight() / 2), Justification::bottomRight);
-    g.setFont (PixelLookAndFeel::pixelFont (52.0f));
-    g.drawText (String (value).paddedLeft ('0', 3), left.withTrimmedTop (left.getHeight() / 2), Justification::topRight);
-
-    g.setFont (PixelLookAndFeel::pixelFont (12.0f));
-    g.setColour (textDim);
-    g.drawFittedText ("DRAG UP / DOWN\nDOUBLE-CLICK = 0\n\nAUTOMATE: BUILD", right, Justification::centredLeft, 4);
+    g.setFont (PixelLookAndFeel::pixelFont (26.0f));
+    g.setColour (value > 85 ? hotRed : value > 50 ? Colour (0xffffd60a) : Colours::white.withAlpha (0.85f));
+    g.drawText (String (value) + "%", buildSlider.getBounds().withY (buildSlider.getBottom() + 2).withHeight (32),
+                Justification::centred);
 
     if (screenFlash > 0.0f)
     {

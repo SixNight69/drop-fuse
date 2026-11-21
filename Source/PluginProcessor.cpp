@@ -79,6 +79,8 @@ void DropTNTProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     buildSmooth.setCurrentAndTargetValue (buildParam->load() / 100.0f);
 
     smoothCoeff5ms = (float) std::exp (-1.0 / (0.005 * sampleRate));
+    gateGain  = 1.0f;
+    gateCoeff = (float) std::exp (-1.0 / (0.002 * sampleRate));
     compAtt = (float) std::exp (-1.0 / (0.001 * sampleRate));
     compRel = (float) std::exp (-1.0 / (0.08 * sampleRate));
     compEnv = 0.0f;
@@ -154,6 +156,7 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
         echoFbHp[0] = echoFbHp[1] = 0.0f;
         echoTime = (float) (0.5 * samplesPerBeat);
         compEnv = 0.0f;
+        gateGain = 1.0f;
         revSendSmoothed = echoSendSmoothed = 0.0f;
     }
 
@@ -173,7 +176,7 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
         const int segLen = jmin (segmentSize, n - segStart);
         float room = 0.8f;
 
-        // ---- pass 1: low cut, crunch, echo, fill room send ----
+        // ---- pass 1: low cut, crunch, gate, echo, fill room send ----
         for (int c = 0, start = 0; start < segLen; ++c, start += chunkSize)
         {
             const int len = jmin (chunkSize, segLen - start);
@@ -190,6 +193,13 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
             const float drive    = dbToGain (20.0f * crunch);
             const float driveMix = ramp (b, 0.0f, 0.10f);              // fades in, no jump at the start
             const float driveComp = 1.0f / (0.7f * std::tanh (drive * 0.35f) / 0.35f + 0.3f * jmin (drive, 1.0f / 0.35f));
+
+            // gate: 1/4 -> 1/8 -> 1/16 across 0-100, depth grows gently, open part compensated
+            const bool   gateOn = b >= 0.02f;
+            const double gateDiv = b < 0.34f ? 1.0 : b < 0.67f ? 0.5 : 0.25;
+            const float  gateDepth = 0.8f * std::pow (ramp (b, 0.02f, 0.70f), 1.3f);
+            const float  gateEnergy = 0.5f + 0.5f * (1.0f - gateDepth) * (1.0f - gateDepth);
+            const float  gateComp = std::pow (gateEnergy, -0.35f);
 
             // echo: time 1/2 beat -> 1/128 beat (a few ms = resonant buzz), feedback up
             const float e = std::pow (ramp (b, 0.15f, 1.0f), 0.9f);
@@ -221,6 +231,17 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
                     xl += driveMix * (sl - xl);
                     xr += driveMix * (sr2 - xr);
                 }
+
+                float g = 1.0f;
+                if (gateOn)
+                {
+                    double frac = std::fmod (ppq + (double) s * beatsPerSample, gateDiv) / gateDiv;
+                    if (frac < 0.0) frac += 1.0;
+                    g = frac < 0.5 ? gateComp : gateComp * (1.0f - gateDepth);
+                }
+                gateGain = g + gateCoeff * (gateGain - g);
+                xl *= gateGain;
+                xr *= gateGain;
 
                 echoSendSmoothed = echoSend + smoothCoeff5ms * (echoSendSmoothed - echoSend);
                 revSendSmoothed  = revSend  + smoothCoeff5ms * (revSendSmoothed  - revSend);

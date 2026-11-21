@@ -26,7 +26,13 @@ private:
     void timerCallback() override;
     void explode();
 
-    struct Geometry { juce::Point<float> topLeft; float px; juce::Point<float> sparkPos; };
+    struct Geometry
+    {
+        juce::Point<float> topLeft;
+        float px = 0.0f, pxY = 0.0f, width = 0.0f;
+        std::array<float, 22> colX {};          // x offset of each art column (artW + 1)
+        juce::Point<float> sparkPos;
+    };
     Geometry getGeometry() const;
     int  burnedFuseRows() const;
 
@@ -35,7 +41,6 @@ private:
     void drawGround (juce::Graphics&);
     void drawDynamite (juce::Graphics&, const Geometry&, float flash, float alpha);
     void drawParticles (juce::Graphics&);
-    void drawReadout (juce::Graphics&);
 
     struct Particle
     {
@@ -51,7 +56,7 @@ private:
     juce::Slider buildSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> buildAttachment;
 
-    juce::Rectangle<int> sceneArea, buildArea, readoutArea;
+    juce::Rectangle<int> sceneArea, buildArea;
     float groundY = 0.0f;
 
     std::vector<Particle> particles;
