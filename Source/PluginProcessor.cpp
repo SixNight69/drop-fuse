@@ -8,7 +8,6 @@ namespace
     constexpr int   segmentSize = 512;
     constexpr int   chunkSize   = 32;
     constexpr int   maxChunks   = segmentSize / chunkSize;
-    constexpr double divisionBeats[] = { 1.0, 0.5, 0.25, 0.125 };
 
     constexpr float echoWet  = 0.7f;
     constexpr float roomWet  = 0.8f;
@@ -20,12 +19,6 @@ namespace
     }
     float dbToGain (float db) noexcept { return std::exp (db * 0.115129255f); }
     float gainToDb (float g) noexcept  { return 8.68588964f * std::log (g + 1.0e-9f); }
-}
-
-const char* DropTNTProcessor::divisionName (int idx) noexcept
-{
-    static const char* names[] = { "1/4", "1/8", "1/16", "1/32" };
-    return (idx >= 0 && idx < 4) ? names[idx] : "OFF";
 }
 
 DropTNTProcessor::DropTNTProcessor()
@@ -85,8 +78,6 @@ void DropTNTProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     buildSmooth.reset (sampleRate, 0.02);
     buildSmooth.setCurrentAndTargetValue (buildParam->load() / 100.0f);
 
-    gateGain  = 1.0f;
-    gateCoeff = (float) std::exp (-1.0 / (0.0015 * sampleRate));
     smoothCoeff5ms = (float) std::exp (-1.0 / (0.005 * sampleRate));
     compAtt = (float) std::exp (-1.0 / (0.001 * sampleRate));
     compRel = (float) std::exp (-1.0 / (0.08 * sampleRate));
@@ -146,7 +137,7 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
         if (! idle)
         {
             idle = true;
-            displayDivision.store (-1);
+            displayCrunchDb.store (0.0f);
             displayCutoff.store (20.0f);
             displayEchoBeats.store (0.0f);
             displayRatio.store (1.0f);
@@ -162,7 +153,6 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
         for (auto& b : echoBuf) std::fill (b.begin(), b.end(), 0.0f);
         echoFbHp[0] = echoFbHp[1] = 0.0f;
         echoTime = (float) (0.5 * samplesPerBeat);
-        gateGain = 1.0f;
         compEnv = 0.0f;
         revSendSmoothed = echoSendSmoothed = 0.0f;
     }
@@ -183,7 +173,7 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
         const int segLen = jmin (segmentSize, n - segStart);
         float room = 0.8f;
 
-        // ---- pass 1: low cut, gate, echo, fill room send ----
+        // ---- pass 1: low cut, crunch, echo, fill room send ----
         for (int c = 0, start = 0; start < segLen; ++c, start += chunkSize)
         {
             const int len = jmin (chunkSize, segLen - start);
@@ -195,11 +185,11 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
             hpf2.setCutoffFrequency (cutoff);
             hpf1.setResonance (0.707f + 1.1f * b * b);
 
-            // gate: denser AND shorter as it climbs
-            const float gateDepth = ramp (b, 0.05f, 0.30f);
-            const int   divIdx = b < 0.05f ? -1 : b < 0.35f ? 0 : b < 0.60f ? 1 : b < 0.85f ? 2 : 3;
-            const double div = divIdx >= 0 ? divisionBeats[divIdx] : 1.0;
-            const float duty = 0.55f - 0.25f * ramp (b, 0.5f, 1.0f);
+            // crunch: drive rises 0 -> +20 dB, output level-compensated
+            const float crunch   = std::pow (ramp (b, 0.03f, 1.0f), 0.8f);
+            const float drive    = dbToGain (20.0f * crunch);
+            const float driveMix = ramp (b, 0.0f, 0.10f);              // fades in, no jump at the start
+            const float driveComp = 1.0f / (0.7f * std::tanh (drive * 0.35f) / 0.35f + 0.3f * jmin (drive, 1.0f / 0.35f));
 
             // echo: time 1/2 beat -> 1/128 beat (a few ms = resonant buzz), feedback up
             const float e = std::pow (ramp (b, 0.15f, 1.0f), 0.9f);
@@ -222,16 +212,15 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
                 float xl = hpf2.processSample (0, hpf1.processSample (0, L[s]));
                 float xr = stereo ? hpf2.processSample (1, hpf1.processSample (1, R[s])) : xl;
 
-                float g = 1.0f;
-                if (divIdx >= 0)
+                if (driveMix > 0.0f)
                 {
-                    double frac = std::fmod (ppq + (double) s * beatsPerSample, div) / div;
-                    if (frac < 0.0) frac += 1.0;
-                    if (frac >= duty) g = 1.0f - gateDepth;
+                    // 70% tanh saturation + 30% hard clip = crunch
+                    const float dl = xl * drive, dr = xr * drive;
+                    const float sl = (0.7f * std::tanh (dl) + 0.3f * jlimit (-1.0f, 1.0f, dl)) * driveComp;
+                    const float sr2 = (0.7f * std::tanh (dr) + 0.3f * jlimit (-1.0f, 1.0f, dr)) * driveComp;
+                    xl += driveMix * (sl - xl);
+                    xr += driveMix * (sr2 - xr);
                 }
-                gateGain = g + gateCoeff * (gateGain - g);
-                xl *= gateGain;
-                xr *= gateGain;
 
                 echoSendSmoothed = echoSend + smoothCoeff5ms * (echoSendSmoothed - echoSend);
                 revSendSmoothed  = revSend  + smoothCoeff5ms * (revSendSmoothed  - revSend);
@@ -254,7 +243,7 @@ void DropTNTProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer&)
                 if (stereo) R[s] = xr + yr * echoWet;
             }
 
-            displayDivision.store (gateDepth > 0.001f ? divIdx : -1);
+            displayCrunchDb.store (20.0f * crunch * driveMix);
             displayCutoff.store (cutoff);
             displayEchoBeats.store (echoSend > 0.001f ? echoBeats : 0.0f);
             displayRatio.store (ratios[c]);

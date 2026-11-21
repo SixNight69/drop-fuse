@@ -4,7 +4,7 @@
 #include <juce_dsp/juce_dsp.h>
 
 // Drop TNT v3: one "Build" knob (0-100). Everything squeezes into a point, then explodes.
-//   Build up  -> low cut sweeps up (thin, piercing), gate gets denser and shorter,
+//   Build up  -> low cut sweeps up (thin, piercing), crunch distortion drives harder,
 //                DJ-style echo: time shrinks 1/2 beat -> a few ms with rising feedback
 //                (pitch glides up into a sharp resonant buzz), room shrinks from big to tiny,
 //                compressor squashes harder, stereo collapses to mono.
@@ -45,12 +45,11 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     // Live readouts for the GUI
-    std::atomic<int>   displayDivision  { -1 };   // -1 = off, 0 = 1/4, 1 = 1/8, 2 = 1/16, 3 = 1/32
+    std::atomic<float> displayCrunchDb  { 0.0f };
     std::atomic<float> displayCutoff    { 20.0f };
     std::atomic<float> displayEchoBeats { 0.0f }; // 0 = echo off
     std::atomic<float> displayRatio     { 1.0f };
 
-    static const char* divisionName (int idx) noexcept;
 
 private:
     float readEcho (int ch, float delaySamples) const noexcept;
@@ -80,8 +79,6 @@ private:
     float echoFbHp[2] { 0.0f, 0.0f };  // one-pole high-pass state in the feedback loop
     float echoHpCoeff = 0.97f;
 
-    // gate
-    float gateGain = 1.0f, gateCoeff = 0.99f;
 
     // compressor ("squash")
     float compEnv = 0.0f, compAtt = 0.9f, compRel = 0.999f;

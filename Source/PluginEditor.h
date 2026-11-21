@@ -68,7 +68,6 @@ private:
     juce::Point<float> shakeOffset;
     juce::Image background;
     float lastPaintedBuild = -1.0f;
-    int   lastPaintedDivision = -2;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DropTNTEditor)
 };

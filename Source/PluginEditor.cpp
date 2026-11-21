@@ -300,11 +300,9 @@ void DropTNTEditor::timerCallback()
     // only redraw when something is actually moving (idle GUI = ~0 CPU)
     const bool animating = build > 0.001f || ! particles.empty() || screenFlash > 0.0f || boomText > 0.0f
                            || hiddenTime > 0.0f || respawn < 1.0f || boomShake > 0.0f;
-    const int div = processor.displayDivision.load();
-    if (animating || std::abs (build - lastPaintedBuild) > 1.0e-4f || div != lastPaintedDivision)
+    if (animating || std::abs (build - lastPaintedBuild) > 1.0e-4f)
     {
         lastPaintedBuild = build;
-        lastPaintedDivision = div;
         repaint();
     }
 }
@@ -408,7 +406,7 @@ void DropTNTEditor::drawParticles (Graphics& g)
 
 void DropTNTEditor::drawReadout (Graphics& g)
 {
-    const int div = processor.displayDivision.load();
+    const float crunchDb = processor.displayCrunchDb.load();
     const float cut = processor.displayCutoff.load();
     const float echoBeats = processor.displayEchoBeats.load();
     const float ratio = processor.displayRatio.load();
@@ -417,7 +415,7 @@ void DropTNTEditor::drawReadout (Graphics& g)
 
     auto cutText = cut >= 1000.0f ? String (cut / 1000.0f, 2) + "kHz" : String (roundToInt (cut)) + "Hz";
     auto items = StringArray {
-        String ("GATE ") + DropTNTProcessor::divisionName (div),
+        crunchDb < 0.5f ? String ("CRUNCH OFF") : "CRUNCH +" + String (roundToInt (crunchDb)) + "dB",
         "LOW CUT " + cutText,
         "ECHO " + echoText,
         "SQUASH " + String (ratio, 1) + ":1"
@@ -431,7 +429,7 @@ void DropTNTEditor::drawReadout (Graphics& g)
         auto cell = area.removeFromLeft (w);
         g.setColour (Colour (0xff181c24));
         g.fillRect (cell.reduced (3, 4));
-        g.setColour (i == 0 && div >= 0 ? Colour (0xffffd60a) : Colours::white.withAlpha (0.8f));
+        g.setColour (i == 0 && crunchDb >= 0.5f ? Colour (0xffffd60a) : Colours::white.withAlpha (0.8f));
         g.drawText (items[i], cell, Justification::centred);
     }
 }
